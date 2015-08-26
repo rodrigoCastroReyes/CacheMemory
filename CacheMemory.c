@@ -65,11 +65,13 @@ int listIsEmpty(List*l){
 }
 
 typedef struct Item{
+	NodeList *parent;
 	char *reference;
 }Item;
 
 Item *itemNew(char*reference){
 	Item *i=(Item*)malloc(sizeof(Item));
+	i->parent=NULL;
 	i->reference=(char*)malloc(sizeof(char)*strlen(reference));
 	strcpy(i->reference,reference);
 	return i;
@@ -93,6 +95,7 @@ typedef struct HashTable{
 	int size;
 	Cubeta **cubetas;
 }HashTable;
+
 
 HashTable *hashTableNew(int size){
 	HashTable *h = (HashTable*)malloc(sizeof(HashTable));
@@ -123,7 +126,6 @@ Item *hashTableGet(HashTable *table,char *reference){
 	NodeList*it;
 	Item* item=NULL;
 	if(listIsEmpty(list)){
-		printf("vacio\n");
 		return NULL;
 	}
 	for(it=list->front;it!=NULL;it=it->next){
@@ -135,27 +137,106 @@ Item *hashTableGet(HashTable *table,char *reference){
 	return NULL;
 }
 
+typedef struct MemoryCache{
+	HashTable *table;
+	Item**data;
+	int misses;
+	int hits;
+	int size;
+	int currentSize;
+}MemoryCache;
+
+MemoryCache*memoryCacheNew(int size){
+	int i;
+	MemoryCache*mem=(MemoryCache*)malloc(sizeof(MemoryCache));
+	mem->size=size;
+	mem->currentSize=0;
+	mem->hits=0;
+	mem->misses=0;
+	mem->table=hashTableNew(size*size);
+	mem->data=(Item**)malloc(sizeof(Item)*size);
+	for(i=0;i<size;i++){
+		mem->data[i]=NULL;
+	}
+	return mem;
+}
+
+int memoryCacheIsFull(MemoryCache*mem){
+	if(mem->currentSize == mem->size){
+		return 1;
+	}
+	return 0;
+}
+
+void memoryCacheInsert(MemoryCache*mem,Queue*queue, char*reference){
+	Item *rPage=hashTableGet(mem->table,reference);
+	if(rPage==NULL){//hubo un miss dado que la pagina no esta en la cache
+		mem->misses++;
+		if(!memoryCacheIsFull(mem)){//si hay espacio en la cache ingreso el nuevo elemento
+			Item *newItem=itemNew(reference);
+			NodeList*parent=nodeListNew(newItem);
+			newItem->parent=parent;
+			hashTableInsert(mem->table,newItem);
+			enQueue(queue,parent);
+			mem->data[mem->currentSize]=newItem;
+			mem->currentSize++;
+		}else{
+			//algoritmos de desalojo
+		}
+	}else{//hubo un hit
+		mem->hits++;
+		//mover node dentro de la cola si es necesario 
+		NodeList *node=rPage->parent;
+		if(node==queue->front){//si node ya esta en el tope la cola permanece sin cambio
+			return;
+		}
+		if(node==queue->end){//si node esta al final, lo vuelve a ingresar al tope
+			deQueue(queue);
+			enQueue(queue,node);
+			return;
+		}
+		//si node esta en el medio lo reingresa al tope
+		NodeList *p = node->prev;
+		NodeList *n = node->next;
+
+		p->next = n;
+		n->prev = p;
+		node->next = queue->front;
+		node->prev = NULL;
+		queue->front = node;
+	}
+}
+
+void memoryCachePrint(MemoryCache*mem){
+	int i;
+	for(i=0;i<mem->size;i++){
+		if(mem->data[i]!=NULL){
+			itemPrint(mem->data[i]);
+			printf("\n");
+		}
+	}
+}
+
+
+void printList(List*list){
+	NodeList*it;
+	Item*item;
+	for(it=list->front;it!=NULL;it=it->next){
+		item=(Item*)it->value;
+		itemPrint(item);
+	}
+}
 
 int main(){
-	printf("Demo Data Structures \n");
-	List *list=listNew();
-	Item *i=itemNew("/documents/holamundo");
-	Item *l=itemNew("/documents/holamendk");
-	Item *j=itemNew("/documents/chao");
-	Item *k=itemNew("/documents/hola");
-	
-	HashTable*tabla=hashTableNew(20);
-	hashTableInsert(tabla,i);
-	hashTableInsert(tabla,j);
-	hashTableInsert(tabla,k);
-	hashTableInsert(tabla,l);
-
-	Item *buscado=hashTableGet(tabla,"/documents/holamendk");
-	if(buscado){
-		itemPrint(buscado);
-	}else{
-		printf("no esta \n");
-	}
-	
+	MemoryCache*mem=memoryCacheNew(10);
+	Queue*queue=queueNew();
+	memoryCacheInsert(mem,queue,"10");
+	memoryCacheInsert(mem,queue,"10");
+	memoryCacheInsert(mem,queue,"50");
+	memoryCacheInsert(mem,queue,"30");
+	memoryCacheInsert(mem,queue,"50");
+	printList(queue);
+	printf("hits: %d\n",mem->hits);
+	printf("misses: %d\n",mem->misses);
 }
 
