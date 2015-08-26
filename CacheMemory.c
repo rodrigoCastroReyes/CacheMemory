@@ -64,7 +64,6 @@ int listIsEmpty(List*l){
 	return 0;
 }
 
-
 typedef struct Item{
 	char *reference;
 }Item;
@@ -106,33 +105,34 @@ HashTable *hashTableNew(int size){
 	return h;
 }
 
-int hash(char *reference){
-	return 1;
+int hash(char *reference,int size){
+	return (unsigned int)strlen((char *)reference)%size;
 }
 
 void hashTableInsert(HashTable *table,Item*item){
-	int index=hash(item->reference);
+	int index=hash(item->reference,table->size);
 	Cubeta *cubeta=table->cubetas[index];
 	List *list=cubeta->items;
 	enQueue(list,nodeListNew(item));
 }
 
 Item *hashTableGet(HashTable *table,char *reference){
-	int index=hash(reference);
+	int index=hash(reference,table->size);
 	Cubeta *cubeta=table->cubetas[index];
 	List *list=cubeta->items;
 	NodeList*it;
 	Item* item=NULL;
 	if(listIsEmpty(list)){
+		printf("vacio\n");
 		return NULL;
 	}
 	for(it=list->front;it!=NULL;it=it->next){
 		item=(Item*)it->value;
 		if(strcmp(item->reference,reference)==0){
-			break;
+			return item;
 		}
 	}
-	return item;
+	return NULL;
 }
 
 
@@ -140,27 +140,22 @@ int main(){
 	printf("Demo Data Structures \n");
 	List *list=listNew();
 	Item *i=itemNew("/documents/holamundo");
-	Item *k=itemNew("/documents/hola");
+	Item *l=itemNew("/documents/holamendk");
 	Item *j=itemNew("/documents/chao");
+	Item *k=itemNew("/documents/hola");
+	
+	HashTable*tabla=hashTableNew(20);
+	hashTableInsert(tabla,i);
+	hashTableInsert(tabla,j);
+	hashTableInsert(tabla,k);
+	hashTableInsert(tabla,l);
 
-	enQueue(list,nodeListNew(i));
-	enQueue(list,nodeListNew(j));
-	enQueue(list,nodeListNew(k));
-
-	Item *item;
-	NodeList*it;
-	for(it=list->front;it!=NULL;it=it->next){
-		item=(Item*)it->value;
-		itemPrint(item);
+	Item *buscado=hashTableGet(tabla,"/documents/holamendk");
+	if(buscado){
+		itemPrint(buscado);
+	}else{
+		printf("no esta \n");
 	}
-
-	it=deQueue(list);
-	itemPrint(it->value);
-
-	for(it=list->front;it!=NULL;it=it->next){
-		item=(Item*)it->value;
-		itemPrint(item);
-	}
-
-
+	
 }
+
