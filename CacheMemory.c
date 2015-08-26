@@ -1,88 +1,166 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+typedef struct NodeList{
+	struct NodeList *next;
+	struct NodeList *prev; 
+	void *value;
+}NodeList;
+
+typedef struct List
+{
+	struct NodeList *front,*end;
+}List;
+
+typedef List Queue;
+
+List *listNew(){
+	List *l=(List*)malloc(sizeof(List));
+	l->front=NULL;
+	l->end=NULL;
+	return l;
+}
+
+Queue *queueNew(){
+	return listNew();
+}
+
+NodeList *nodeListNew(void*value){
+	NodeList *node=(NodeList*)malloc(sizeof(NodeList));
+	node->next=NULL;
+	node->value=value;
+	return node;
+}
+
+void enQueue(List *l,NodeList *node){//listAddNodeFirst
+	if(l->front==NULL && l->end == NULL){
+		l->front=l->end=node;
+	}else{
+		node->prev=NULL;
+		node->next=l->front;
+		l->front->prev=node;
+		l->front=node;		
+	}
+}
+
+NodeList *deQueue(List*l){//listRemoveNodeLast
+	NodeList *fin = l->end;
+	if(l->front==l->end){
+		l->front=l->end=NULL;
+		return fin;
+	}else{
+		l->end=fin->prev;
+		fin->prev->next=NULL;
+		fin->prev=NULL;
+		return fin;
+	}
+}
+
+int listIsEmpty(List*l){
+	if(l->front == NULL && l->end == NULL){
+		return 1;
+	}
+	return 0;
+}
+
 
 typedef struct Item{
-	int key;
 	char *reference;
 }Item;
 
-typedef struct Page{
-	struct Page *next;
-	Item *value;
-}Page;
+Item *itemNew(char*reference){
+	Item *i=(Item*)malloc(sizeof(Item));
+	i->reference=(char*)malloc(sizeof(char)*strlen(reference));
+	strcpy(i->reference,reference);
+	return i;
+}
 
-typedef struct Queue
-{
-	struct Page *front,*end;
-}Queue;
+void itemPrint(Item *item){
+	printf("%s\n",item->reference);
+}
 
-typedef struct HashTable
-{
+typedef struct Cubeta{
+	List *items;
+}Cubeta;
+
+Cubeta *cubetaNew(){
+	Cubeta *c=(Cubeta*)malloc(sizeof(Cubeta));
+	c->items=listNew();
+	return c;
+}
+
+typedef struct HashTable{
 	int size;
-	int current_size;
-	Page **pages;
+	Cubeta **cubetas;
 }HashTable;
-
 
 HashTable *hashTableNew(int size){
 	HashTable *h = (HashTable*)malloc(sizeof(HashTable));
 	int i;
 	h->size=size;
-	h->current_size=0;
-	h->pages = (Page**) malloc(sizeof(Page*)*size);
+	h->cubetas = (Cubeta**) malloc(sizeof(Cubeta*)*size);
 	for(i=0;i<size;i++){
-		h->pages[i] = NULL;
+		h->cubetas[i]=cubetaNew();
 	}
 	return h;
 }
 
-int hashtableIsEmpty(HashTable *table){
-	return table->current_size == 0;
+int hash(char *reference){
+	return 1;
 }
 
-int hashtableIsFull(HashTable*table){
-	return table->current_size==table->size;
+void hashTableInsert(HashTable *table,Item*item){
+	int index=hash(item->reference);
+	Cubeta *cubeta=table->cubetas[index];
+	List *list=cubeta->items;
+	enQueue(list,nodeListNew(item));
 }
 
-Page *pageNew(Item*value){
-	Page *page=(Page*)malloc(sizeof(Page));
-	page->next=NULL;
-	page->value=value;
-	return page;
-}
-
-Item *itemNew(int key,char*reference){
-	
-}
-
-Queue *queueNew(){
-	Queue *q=(Queue*)malloc(sizeof(Queue));
-	q->front=NULL;
-	q->end=NULL;
-	return q;
-}
-
-void enQueue(Queue *q,Item *item);
-Item *deQueue(Queue*q);
-
-void insertPage(HashTable* hashtable, int key,char *reference){
-	if(!hashtableIsFull(hashtable)){
-		//insertar en la memoria cache
-	}else{
-		//algoritmos de desalojo
+Item *hashTableGet(HashTable *table,char *reference){
+	int index=hash(reference);
+	Cubeta *cubeta=table->cubetas[index];
+	List *list=cubeta->items;
+	NodeList*it;
+	Item* item=NULL;
+	if(listIsEmpty(list)){
+		return NULL;
 	}
-}
-
-
-void referencePage(HashTable *hashtable,char **string_reference){
-
-
+	for(it=list->front;it!=NULL;it=it->next){
+		item=(Item*)it->value;
+		if(strcmp(item->reference,reference)==0){
+			break;
+		}
+	}
+	return item;
 }
 
 
 int main(){
-	printf("hello world \n");
+	printf("Demo Data Structures \n");
+	List *list=listNew();
+	Item *i=itemNew("/documents/holamundo");
+	Item *k=itemNew("/documents/hola");
+	Item *j=itemNew("/documents/chao");
+
+	enQueue(list,nodeListNew(i));
+	enQueue(list,nodeListNew(j));
+	enQueue(list,nodeListNew(k));
+
+	Item *item;
+	NodeList*it;
+	for(it=list->front;it!=NULL;it=it->next){
+		item=(Item*)it->value;
+		itemPrint(item);
+	}
+
+	it=deQueue(list);
+	itemPrint(it->value);
+
+	for(it=list->front;it!=NULL;it=it->next){
+		item=(Item*)it->value;
+		itemPrint(item);
+	}
+
+
 }
-
-
-
