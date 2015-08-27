@@ -66,6 +66,7 @@ int listIsEmpty(List*l){
 
 typedef struct Item{
 	NodeList *parent;
+	int index;
 	char *reference;
 }Item;
 
@@ -119,10 +120,14 @@ void hashTableInsert(HashTable *table,Item*item){
 	enQueue(list,nodeListNew(item));
 }
 
-Item *hashTableGet(HashTable *table,char *reference){
+List *hashTableGetList(HashTable*table,char*reference){
 	int index=hash(reference,table->size);
 	Cubeta *cubeta=table->cubetas[index];
-	List *list=cubeta->items;
+	return cubeta->items;
+}
+
+Item *hashTableGet(HashTable *table,char *reference){
+	List*list=hashTableGetList(table,reference);
 	NodeList*it;
 	Item* item=NULL;
 	if(listIsEmpty(list)){
@@ -172,16 +177,21 @@ void memoryCacheInsert(MemoryCache*mem,Queue*queue, char*reference){
 	Item *rPage=hashTableGet(mem->table,reference);
 	if(rPage==NULL){//hubo un miss dado que la pagina no esta en la cache
 		mem->misses++;
+		Item *newItem=itemNew(reference);
+		NodeList*parent=nodeListNew(newItem);
+		newItem->parent=parent;
 		if(!memoryCacheIsFull(mem)){//si hay espacio en la cache ingreso el nuevo elemento
-			Item *newItem=itemNew(reference);
-			NodeList*parent=nodeListNew(newItem);
-			newItem->parent=parent;
+			mem->data[mem->currentSize]=newItem;
+			newItem->index=mem->currentSize;
+			mem->currentSize++;
 			hashTableInsert(mem->table,newItem);
 			enQueue(queue,parent);
-			mem->data[mem->currentSize]=newItem;
-			mem->currentSize++;
 		}else{
 			//algoritmos de desalojo
+			int index=lruAlgorithm(mem,queue);
+			mem->data[index]=newItem;
+			hashTableInsert(mem->table,newItem);
+			enQueue(queue,parent);
 		}
 	}else{//hubo un hit
 		mem->hits++;
@@ -207,16 +217,57 @@ void memoryCacheInsert(MemoryCache*mem,Queue*queue, char*reference){
 	}
 }
 
+void nodeListRemove(List*list,NodeList*it){
+	if(list->front == list->end) {
+		list->front = list->end = NULL ;
+		return;
+	}
+	if(it==list->front){
+		list->front=it->next;
+		it->next->prev=NULL;
+		it->next=NULL;	
+	}else if(it==list->end){
+		list->end = it->prev;
+		it->prev->next=NULL;
+		it->prev=NULL;
+	}else{
+		NodeList *p = it->prev;
+		NodeList *n = it->next;
+		p->next = n;
+		n->prev = p;
+		it->next = NULL;
+		it->prev = NULL;
+	}
+}
+
+int lruAlgorithm(MemoryCache*mem,Queue*queue){
+	NodeList*remPage=deQueue(queue);
+	//remover de la tabla de hash
+	Item *remItem=(void*)remPage->value;
+	List *list=hashTableGetList(mem->table,remItem->reference);
+	if(list!=NULL){
+		NodeList*it;
+		Item*item;
+		for(it=list->front;it!=NULL;it=it->next){
+			item=(Item*)it->value;
+			if(strcmp(item->reference,remItem->reference)==0){
+				nodeListRemove(list,it);
+				break;
+			}
+		}
+	}
+	//retornar el indice en donde se debe ingresar el nuevo elemento en la cache
+	return remItem->index;
+}
+
 void memoryCachePrint(MemoryCache*mem){
 	int i;
 	for(i=0;i<mem->size;i++){
 		if(mem->data[i]!=NULL){
 			itemPrint(mem->data[i]);
-			printf("\n");
 		}
 	}
 }
-
 
 void printList(List*list){
 	NodeList*it;
@@ -234,8 +285,12 @@ int main(){
 	memoryCacheInsert(mem,queue,"10");
 	memoryCacheInsert(mem,queue,"50");
 	memoryCacheInsert(mem,queue,"30");
+	memoryCacheInsert(mem,queue,"20");
+	memoryCacheInsert(mem,queue,"15");
+	memoryCacheInsert(mem,queue,"20");
 	memoryCacheInsert(mem,queue,"50");
-	printList(queue);
+	//printList(queue);
+	memoryCachePrint(mem);
 	printf("hits: %d\n",mem->hits);
 	printf("misses: %d\n",mem->misses);
 }
