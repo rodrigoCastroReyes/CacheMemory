@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NOM_ARCHIVO  "/Users/Jhon/Dropbox/Espol/Sistemas Operativos/Proyecto/Evaluacion de Cache/EvaluadorCache/workload.txt"
 
 typedef struct NodeList{
     struct NodeList *next;
@@ -17,11 +16,12 @@ typedef struct List
 
 typedef List Queue;
 
-typedef struct Item{
+typedef struct Item {
     NodeList *parent;
     int index;
     char *reference;
-}Item;
+    int bit;
+} Item;
 
 typedef struct Cubeta{
     List *items;
@@ -39,6 +39,7 @@ typedef struct MemoryCache{
     int hits;
     int size;
     int currentSize;
+    NodeList *hand;
 }MemoryCache;
 
 //Encabezados
@@ -51,6 +52,9 @@ NodeList *nodeListNew(void*value);
 NodeList *deQueue(List*queue);
 int listIsEmpty(List*l);
 void enQueue(List *queue,NodeList *node);
+void circleListMake(List*list);
+void circleListRemove(List*list, NodeList*it);
+void circleListAdd(List*list,NodeList *node);
 Item *itemNew(char*reference);
 void itemPrint(Item *item);
 Cubeta *cubetaNew();
@@ -64,8 +68,19 @@ int memoryCacheIsFull(MemoryCache*mem);
 void nodeListRemove(List*list,NodeList*it);
 int lruAlgorithm(MemoryCache*mem,Queue*queue);
 int lrukAlgorithm(MemoryCache*mem,Queue*queuem, int k);
+
+void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference);
+void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference);
+void memoryCacheInsertClock(MemoryCache*mem, List*list, char*reference);
+
+int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem);
 void memoryCachePrint(MemoryCache*mem);
 void printList(List*list);
+
+void testLRUAlgorithm();
+void testClockAlgorithm();
+void testLRUKAlgorithm();
+
 
 /*******************************************************/
 
@@ -122,11 +137,56 @@ int listIsEmpty(List*l){
     return 0;
 }
 
+void circleListMake(List*list){
+    if (list->front == list->end ) {
+        return;
+    }else{
+        list->end->next = list->front;
+        list->front->prev = list->end;
+    }
+}
+
+void circleListRemove(List*list, NodeList*it){
+    if (list->front == list->end) {
+        list->front = list->end = NULL;
+        return;
+    }
+    if (it == list->front) {
+        list->front = it->next;
+        it->next->prev = NULL;
+        it->next = NULL;
+        list->end->next = list->front;
+        list->front->prev = list->end;
+    } else if (it == list->end) {
+        list->end = it->prev;
+        it->prev->next = NULL;
+        it->prev = NULL;
+        it->next = NULL;
+        list->end->next = list->front;
+        list->front->prev = list->end;
+    } else {
+        NodeList *p = it->prev;
+        NodeList *n = it->next;
+        p->next = n;
+        n->prev = p;
+        it->next = NULL;
+        it->prev = NULL;
+    }
+}
+
+void circleListAdd(List*list,NodeList *node){
+    enQueue(list,node);
+    list->end->next = node;
+    list->front->prev = list->end;
+}
+
+
 
 Item *itemNew(char*reference){
     Item *i=(Item*)malloc(sizeof(Item));
     i->parent=NULL;
-    i->reference=(char*)malloc(sizeof(char)*strlen(reference));
+    i->reference=(char*)malloc(sizeof(char)*strlen(reference)+1);
+    memset(i->reference,'0',sizeof(char)*strlen(reference)+1);
     strcpy(i->reference,reference);
     return i;
 }
@@ -162,6 +222,21 @@ void hashTableInsert(HashTable *table,Item*item){
     Cubeta *cubeta=table->cubetas[index];
     List *list=cubeta->items;
     enQueue(list,nodeListNew(item));
+}
+
+void hashTableRemove(HashTable *table,Item*remItem){
+    List *list = hashTableGetList(table, remItem->reference);
+    if (list != NULL) {
+        NodeList*it;
+        Item*item;
+        for (it = list->front; it != NULL; it = it->next) {
+            item = (Item*) it->value;
+            if (strcmp(item->reference, remItem->reference) == 0) {
+                nodeListRemove(list, it);
+                break;
+            }
+        }
+    }
 }
 
 List *hashTableGetList(HashTable*table,char*reference){
@@ -209,7 +284,7 @@ int memoryCacheIsFull(MemoryCache*mem){
     return 0;
 }
 
-void memoryCacheInsert(MemoryCache*mem,Queue*queue, char*reference){
+void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference){
     Item *rPage=hashTableGet(mem->table,reference);
     if(rPage==NULL){//hubo un miss dado que la pagina no esta en la cache
         mem->misses++;
@@ -224,7 +299,7 @@ void memoryCacheInsert(MemoryCache*mem,Queue*queue, char*reference){
             enQueue(queue,parent);
         }else{
             //algoritmos de desalojo
-            int index=lrukAlgorithm(mem,queue,2);
+            int index=lruAlgorithm(mem,queue);
             mem->data[index]=newItem;
             hashTableInsert(mem->table,newItem);
             enQueue(queue,parent);
@@ -254,20 +329,65 @@ void memoryCacheInsert(MemoryCache*mem,Queue*queue, char*reference){
     }
 }
 
-void nodeListRemove(List*list,NodeList*it){
-    if(list->front == list->end) {
-        list->front = list->end = NULL ;
+void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference){
+    Item *rPage=hashTableGet(mem->table,reference);
+    if(rPage==NULL){//hubo un miss dado que la pagina no esta en la cache
+        mem->misses++;
+        Item *newItem=itemNew(reference);
+        NodeList*parent=nodeListNew(newItem);
+        newItem->parent=parent;
+        if(!memoryCacheIsFull(mem)){//si hay espacio en la cache ingreso el nuevo elemento
+            mem->data[mem->currentSize]=newItem;
+            newItem->index=mem->currentSize;
+            mem->currentSize++;
+            hashTableInsert(mem->table,newItem);
+            enQueue(queue,parent);
+        }else{
+            //algoritmos de desalojo
+            int index=lrukAlgorithm(mem,queue,5);
+            mem->data[index]=newItem;
+            hashTableInsert(mem->table,newItem);
+            enQueue(queue,parent);
+        }
+    }else{//hubo un hit
+        mem->hits++;
+        //mover node dentro de la cola si es necesario
+        NodeList *node=rPage->parent;
+        if(node==queue->front){//si node ya esta en el tope la cola permanece sin cambio
+            return;
+        }
+        if(node==queue->end){//si node esta al final, lo vuelve a ingresar al tope
+            deQueue(queue);
+            enQueue(queue,node);
+            return;
+        }
+        //si node esta en el medio lo reingresa al tope
+        NodeList *p = node->prev;
+        NodeList *n = node->next;
+        
+        p->next = n;
+        n->prev = p;
+        node->next = queue->front;
+        queue->front->prev = node;
+        node->prev = NULL;
+        queue->front = node;
+    }
+}
+
+void nodeListRemove(List*list, NodeList*it) {
+    if (list->front == list->end) {
+        list->front = list->end = NULL;
         return;
     }
-    if(it==list->front){
-        list->front=it->next;
-        it->next->prev=NULL;
-        it->next=NULL;
-    }else if(it==list->end){
+    if (it == list->front) {
+        list->front = it->next;
+        it->next->prev = NULL;
+        it->next = NULL;
+    } else if (it == list->end) {
         list->end = it->prev;
-        it->prev->next=NULL;
-        it->prev=NULL;
-    }else{
+        it->prev->next = NULL;
+        it->prev = NULL;
+    } else {
         NodeList *p = it->prev;
         NodeList *n = it->next;
         p->next = n;
@@ -277,30 +397,18 @@ void nodeListRemove(List*list,NodeList*it){
     }
 }
 
-
-int lruAlgorithm(MemoryCache*mem,Queue*queue){
-    NodeList*remPage=deQueue(queue);
-    //remover de la tabla de hash
-    Item *remItem=(void*)remPage->value;
-    List *list=hashTableGetList(mem->table,remItem->reference);
-    if(list!=NULL){
-        NodeList*it;
-        Item*item;
-        for(it=list->front;it!=NULL;it=it->next){
-            item=(Item*)it->value;
-            if(strcmp(item->reference,remItem->reference)==0){
-                nodeListRemove(list,it);
-                break;
-            }
-        }
-    }
-    //retornar el indice en donde se debe ingresar el nuevo elemento en la cache
-    return remItem->index;
+int lruAlgorithm(MemoryCache*mem, Queue*queue) {
+    NodeList*remPage = deQueue(queue);//quitar el ultimo de la cola
+    Item *remItem = (void*) remPage->value;
+    hashTableRemove(mem->table,remItem);//remover de la tabla de hash
+    return remItem->index;//retornar el indice en donde se debe ingresar el nuevo elemento en la cache
 }
+
 
 int lrukAlgorithm(MemoryCache*mem,Queue*queue, int k){
     NodeList *node;
-    for (NodeList* t = queue->end; t!=NULL; t=t->prev)
+    NodeList *t;
+    for ( t = queue->end; t!=NULL; t=t->prev)
     {
         k--;
         if (k == 0){
@@ -353,53 +461,132 @@ void printList(List*list){
 }
 
 
-int main(){
+void memoryCacheInsertClock(MemoryCache*mem, List*list, char*reference) {
+    Item *rPage = hashTableGet(mem->table, reference);
+    if (rPage == NULL) {//hubo un miss dado que la pagina no esta en la cache
+        mem->misses++;
+        Item *newItem = itemNew(reference);
+        NodeList*parent = nodeListNew(newItem);
+        newItem->parent = parent;
+        if (!memoryCacheIsFull(mem)) {//si hay espacio en la cache ingreso el nuevo elemento
+            mem->data[mem->currentSize] = newItem;
+            newItem->index = mem->currentSize;
+            mem->currentSize++;
+            hashTableInsert(mem->table, newItem);
+            circleListAdd(list,parent);
+            mem->hand = list->end;
+        } else {
+            //algoritmos de desalojo
+            int index = clockAlgorithm(mem,list,newItem);
+            mem->data[index] = newItem;
+            newItem->index = index;
+            hashTableInsert(mem->table, newItem);
+            circleListAdd(list,parent);
+        }
+    } else {//hubo un hit
+        mem->hits++;
+        rPage->bit = 1;
+    }
+}
+
+int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem){
+    int index;
+    NodeList *nodeHand = mem->hand;
+    Item* value = (Item*)nodeHand->value;
+    while(value->bit!=0){
+        value->bit=0;//le da una segunda oportunidad
+        nodeHand = nodeHand->prev;
+        value = nodeHand->value;
+    }
+    index = ((Item*)nodeHand->value)->index;
+    nodeHand->value = newItem;
+    mem->hand = nodeHand->prev;
+    hashTableRemove(mem->table,value); //quita el elemento de la tabla de hash
+    return index;//retorna el indice en donde debe ser ubicado el nuevo elemento
+}
+
+int main(int argc, char** argv) {
+    //testLRUAlgorithm();
+    //testLRUKAlgorithm();
+    testClockAlgorithm();
+    return 0;
+}
+
+void testLRUAlgorithm(){
     FILE *fp;
-    char linea[350];
+    char linea[1000];
+    strcpy(linea,"");
     
-    if ((fp = fopen(NOM_ARCHIVO, "r")) == NULL){
-        perror(NOM_ARCHIVO);
-        return EXIT_FAILURE;
+    if ((fp = fopen("workload.txt", "r")) == NULL){
+        printf("error \n");
+        return ;
     }
+
+    MemoryCache*mem = memoryCacheNew(8000);
+    Queue*queue = queueNew();
     
-    MemoryCache*mem=memoryCacheNew(100);
-    Queue*queue=queueNew();
-    
-    while (fgets(linea, 300, fp) != NULL)
-    {
-        memoryCacheInsert(mem,queue,linea);
+    while (fgets(linea,1000, fp) != NULL){
+        memoryCacheInsertLRU(mem,queue,linea);
     }
+
     fclose(fp);
-    
-//    memoryCacheInsert(mem,queue,"1");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"2");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"3");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"4");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"1");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"2");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"5");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"1");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"2");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"6");
-//    //memoryCachePrint(mem);
-//    memoryCacheInsert(mem,queue,"5");
-//    memoryCacheInsert(mem,queue,"4");
-    
-//    memoryCachePrint(mem);
-    
-    printf("hits: %d\n",mem->hits);
-    printf("misses: %d\n",mem->misses);
-    
+
+    printf("hits: %d\n", mem->hits);
+    printf("misses: %d\n", mem->misses);
     free(mem);
     free(queue);
 }
 
+
+void testClockAlgorithm(){
+    FILE *fp;
+    char linea[1000];
+    strcpy(linea,"");
+    
+    if ((fp = fopen("workload.txt", "r")) == NULL){
+        printf("error \n");
+        return ;
+    }
+    
+    MemoryCache*mem=memoryCacheNew(800);
+    List *list = listNew();
+    circleListMake(list);
+    
+    while (fgets(linea,1000, fp) != NULL){
+        memoryCacheInsertClock(mem,list,linea);
+    }
+
+    fclose(fp);
+
+    printf("hits: %d\n",mem->hits);
+    printf("misses: %d\n",mem->misses);
+    
+    free(mem);
+    free(list);
+}
+
+void testLRUKAlgorithm(){
+    FILE *fp;
+    char linea[1000];
+    strcpy(linea,"");
+    
+    if ((fp = fopen("workload.txt", "r")) == NULL){
+        printf("error \n");
+        return ;
+    }
+
+    MemoryCache*mem = memoryCacheNew(8000);
+    Queue*queue = queueNew();
+    int i=0;
+    while (fgets(linea,1000, fp) != NULL){
+        memoryCacheInsertLRUK(mem,queue,linea);
+        i++;
+    }
+    printf("num referencias %d\n",i);
+    fclose(fp);
+
+    printf("hits: %d\n", mem->hits);
+    printf("misses: %d\n", mem->misses);
+    free(mem);
+    free(queue);
+}
