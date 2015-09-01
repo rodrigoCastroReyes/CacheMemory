@@ -506,9 +506,10 @@ int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem){
 }
 
 int main(int argc, char** argv) {
-    //testLRUAlgorithm();
-    //testLRUKAlgorithm();
+    testLRUAlgorithm();
+    testLRUKAlgorithm();
     testClockAlgorithm();
+    getchar();
     return 0;
 }
 
@@ -531,9 +532,13 @@ void testLRUAlgorithm(){
 
     fclose(fp);
 
-    printf("hits: %d\n", mem->hits);
-    printf("misses: %d\n", mem->misses);
-    free(mem);
+    printf("Evaluando una cache algoritmo LRU con %d referencias:\n",mem->hits + mem->misses);
+    float total=mem->hits + mem->misses;
+	float hitRate = mem->hits/total;
+    float missRate = mem->misses/total;
+	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
+    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
+	free(mem);
     free(queue);
 }
 
@@ -558,8 +563,12 @@ void testClockAlgorithm(){
 
     fclose(fp);
 
-    printf("hits: %d\n",mem->hits);
-    printf("misses: %d\n",mem->misses);
+    printf("Evaluando una cache algoritmo LRU Clock con %d referencias:\n",mem->hits + mem->misses);
+    float total=mem->hits + mem->misses;
+	float hitRate = mem->hits/total;
+    float missRate = mem->misses/total;
+	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
+    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
     
     free(mem);
     free(list);
@@ -582,11 +591,15 @@ void testLRUKAlgorithm(){
         memoryCacheInsertLRUK(mem,queue,linea);
         i++;
     }
-    printf("num referencias %d\n",i);
+    //printf("num referencias %d\n",i);
     fclose(fp);
 
-    printf("hits: %d\n", mem->hits);
-    printf("misses: %d\n", mem->misses);
-    free(mem);
+    printf("Evaluando una cache algoritmo LRU-K con %d referencias:\n",mem->hits + mem->misses);
+    float total=mem->hits + mem->misses;
+	float hitRate = mem->hits/total;
+    float missRate = mem->misses/total;
+	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
+    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
+	free(mem);
     free(queue);
 }
