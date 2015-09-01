@@ -70,7 +70,7 @@ int lruAlgorithm(MemoryCache*mem,Queue*queue);
 int lrukAlgorithm(MemoryCache*mem,Queue*queuem, int k);
 
 void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference);
-void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference);
+void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference, int k);
 void memoryCacheInsertClock(MemoryCache*mem, List*list, char*reference);
 
 int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem);
@@ -329,7 +329,7 @@ void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference){
     }
 }
 
-void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference){
+void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference, int k){
     Item *rPage=hashTableGet(mem->table,reference);
     if(rPage==NULL){//hubo un miss dado que la pagina no esta en la cache
         mem->misses++;
@@ -344,7 +344,7 @@ void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference){
             enQueue(queue,parent);
         }else{
             //algoritmos de desalojo
-            int index=lrukAlgorithm(mem,queue,5);
+            int index=lrukAlgorithm(mem,queue,k);
             mem->data[index]=newItem;
             hashTableInsert(mem->table,newItem);
             enQueue(queue,parent);
@@ -506,10 +506,21 @@ int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem){
 }
 
 int main(int argc, char** argv) {
-    testLRUAlgorithm();
-    testLRUKAlgorithm();
-    testClockAlgorithm();
-    getchar();
+
+    int sizeCache;
+    if (argc != 4) {
+        printf("Usage: %s <POLITICA> <size-Cache> <filename>\n",argv[0]);
+            return 1;
+        }
+    sizeCache = atoi(argv[2]); /* convert strings to integers */
+
+    if (strcmp("LRU",argv[1]) == 0)
+        testLRUAlgorithm();
+    else if (strcmp("LRUK",argv[1]) == 0)
+        testLRUKAlgorithm();
+    else if (strcmp("CLOCK",argv[1]) == 0)
+        testClockAlgorithm();
+
     return 0;
 }
 
@@ -588,7 +599,7 @@ void testLRUKAlgorithm(){
     Queue*queue = queueNew();
     int i=0;
     while (fgets(linea,1000, fp) != NULL){
-        memoryCacheInsertLRUK(mem,queue,linea);
+        memoryCacheInsertLRUK(mem,queue,linea,2);
         i++;
     }
     //printf("num referencias %d\n",i);
