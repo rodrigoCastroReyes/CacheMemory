@@ -554,6 +554,20 @@ char **listReference(char *filePath){
     return list;
 }
 
+
+int optimalAlgorithm(MemoryCache *mem, char**list, int currentIndex){
+    printf("entro a la funcion \n");
+    int i;
+    Item *reqPage;
+    for( i = currentIndex + mem->size ; i > currentIndex  ; i-- ){
+        reqPage = hashTableGet(mem->table,list[i]);
+        if(reqPage!=NULL){
+            return reqPage->index;
+        }
+    }
+    return currentIndex + mem->size;
+}
+
 int main(int argc, char** argv) {
 
     int sizeCache;
