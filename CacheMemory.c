@@ -527,6 +527,33 @@ int getNumLines(char* filename){
     return atoi(readbuf);
 }
 
+char **listReference(char *filePath){
+    char**list;
+    int num_lines = getNumLines(filePath);
+    printf("num lineas: %d\n",num_lines);
+    int i=0;
+    FILE *fp;
+    char linea[1340];
+    strcpy(linea,"");
+
+    list = (char **)malloc(sizeof(char*)*num_lines);
+
+    if ((fp = fopen(filePath, "r")) == NULL){
+        printf("error \n");
+        return ;
+    }
+
+    while (fgets(linea,1340, fp) != NULL){
+        list[i]=(char*)malloc(sizeof(char)*strlen(linea)+1);
+        strcpy(list[i],linea);
+        i++;
+    }
+
+    fclose(fp);
+
+    return list;
+}
+
 int main(int argc, char** argv) {
 
     int sizeCache;
