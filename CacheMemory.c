@@ -505,6 +505,28 @@ int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem){
     return index;//retorna el indice en donde debe ser ubicado el nuevo elemento
 }
 
+int getNumLines(char* filename){
+    FILE *pipein_fp;
+    char readbuf[10];
+    char str[80];
+
+    strcpy(str, "wc -l ");
+    strcat(str, filename);
+
+       /* Create one way pipe line with call to popen() */
+    if (( pipein_fp = popen(str, "r")) == NULL)
+    {
+        perror("popen");
+        return 0;
+    }
+
+    fgets(readbuf, sizeof(readbuf), pipein_fp);
+
+    /* Close the pipe */
+    pclose(pipein_fp);
+    return atoi(readbuf);
+}
+
 int main(int argc, char** argv) {
 
     int sizeCache;
