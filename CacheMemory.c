@@ -81,6 +81,8 @@ void testLRUAlgorithm();
 void testClockAlgorithm();
 void testLRUKAlgorithm();
 
+int getNumLines(char* filename);
+char **listReference(char *filePath);
 
 /*******************************************************/
 
@@ -505,6 +507,8 @@ int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem){
     return index;//retorna el indice en donde debe ser ubicado el nuevo elemento
 }
 
+//Algoritmo optimo 
+
 int getNumLines(char* filename){
     FILE *pipein_fp;
     char readbuf[10];
@@ -554,7 +558,6 @@ char **listReference(char *filePath){
     return list;
 }
 
-
 int optimalAlgorithm(MemoryCache *mem, char**list, int currentIndex){
     printf("entro a la funcion \n");
     int i;
@@ -592,21 +595,36 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list,int currentIndex){
      printf("chao mundo \n");
 }
 
-int main(int argc, char** argv) {
+void testOptimaAlgorithm(){
+    MemoryCache*mem=memoryCacheNew(50);
+    char **list = listReference("head.txt");
+    int i;
+    int max=getNumLines("head.txt");
+    
+    for(i=0;i<max;i++){
+        memoryCacheInsertOptimal(mem,list,i);
+    }
+    printf("Hits: %d\n",mem->hits);
+    printf("Misses: %d\n",mem->misses);
+}
 
+int main(int argc, char** argv) {
+    /*
     int sizeCache;
     if (argc != 4) {
         printf("Usage: %s <POLITICA> <size-Cache> <filename>\n",argv[0]);
             return 1;
         }
-    sizeCache = atoi(argv[2]); /* convert strings to integers */
+    sizeCache = atoi(argv[2]);
 
     if (strcmp("LRU",argv[1]) == 0)
         testLRUAlgorithm();
     else if (strcmp("LRUK",argv[1]) == 0)
         testLRUKAlgorithm();
     else if (strcmp("CLOCK",argv[1]) == 0)
-        testClockAlgorithm();
+        testClockAlgorithm();*/
+
+    testOptimaAlgorithm();
 
     return 0;
 }
