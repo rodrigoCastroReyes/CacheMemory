@@ -568,6 +568,30 @@ int optimalAlgorithm(MemoryCache *mem, char**list, int currentIndex){
     return currentIndex + mem->size;
 }
 
+void memoryCacheInsertOptimal(MemoryCache*mem, char **list,int currentIndex){
+    printf("hola mundo \n");
+    Item *rPage = hashTableGet(mem->table,list[currentIndex]);
+    if (rPage == NULL) {//hubo un miss dado que la pagina no esta en la cache
+        mem->misses++;
+        Item *newItem = itemNew(list[currentIndex]);
+        if (!memoryCacheIsFull(mem)) {//si hay espacio en la cache ingreso el nuevo elemento
+            mem->data[mem->currentSize] = newItem;
+            newItem->index = mem->currentSize;
+            mem->currentSize++;
+            hashTableInsert(mem->table, newItem);
+        } else {
+            //algoritmos de desalojo
+            int index = optimalAlgorithm(mem,list,currentIndex);
+            mem->data[index] = newItem;
+            newItem->index = index;
+            hashTableInsert(mem->table, newItem);
+        }
+    } else {//hubo un hit
+        mem->hits++;       
+    }
+     printf("chao mundo \n");
+}
+
 int main(int argc, char** argv) {
 
     int sizeCache;
