@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 typedef struct NodeList{
     struct NodeList *next;
     struct NodeList *prev;
@@ -15,6 +14,19 @@ typedef struct List
 }List;
 
 typedef List Queue;
+
+/*heap*/
+typedef void *Generic;
+typedef int (*cmpfn)(Generic, Generic);
+typedef enum {ASC, DESC} TSort;
+typedef struct Heap{
+	Generic *Data;
+	int max;
+	int nData;
+	TSort type;
+    cmpfn cmp;
+}Heap;
+/*heap*/
 
 typedef struct Item {
     NodeList *parent;
@@ -45,44 +57,71 @@ typedef struct MemoryCache{
 //Encabezados
 /*******************************************************/
 
-int lruAlgorithm(MemoryCache*mem,Queue*queue);
+/*List*/
 List *listNew();
 Queue *queueNew();
 NodeList *nodeListNew(void*value);
-NodeList *deQueue(List*queue);
 int listIsEmpty(List*l);
+NodeList *deQueue(List*queue);
 void enQueue(List *queue,NodeList *node);
+void nodeListRemove(List*list,NodeList*it);
+void printList(List*list);
+/*CircleList*/
 void circleListMake(List*list);
 void circleListRemove(List*list, NodeList*it);
 void circleListAdd(List*list,NodeList *node);
+/*Item*/
 Item *itemNew(char*reference);
 void itemPrint(Item *item);
+/*Hashtable*/
 Cubeta *cubetaNew();
 HashTable *hashTableNew(int size);
 int hash(char *reference,int size);
 void hashTableInsert(HashTable *table,Item*item);
 List *hashTableGetList(HashTable*table,char*reference);
 Item *hashTableGet(HashTable *table,char *reference);
+/*Memory Cache*/
 MemoryCache *memoryCacheNew(int size);
 int memoryCacheIsFull(MemoryCache*mem);
-void nodeListRemove(List*list,NodeList*it);
+void memoryCachePrint(MemoryCache*mem);
+/*Heap*/
+static int heapIdxLeft(Heap *H, int idxfather);
+static int heapIdxRight(Heap *H, int idxfather);
+static int heapIdxFather(Heap *H, int idx);
+static void heapFix(Heap *H, int idx);
+static int heapCompareXType(Heap *H, int idxa, int idxb);
+static void heapSwap(Heap *H, int idxa, int idxb);
+int heapIsEmpty(Heap *H);
+Heap *heapNew(int max, TSort type, cmpfn cmp);
+Generic heapDeQueue(Heap *H);
+void heapEnQueue(Heap *H, Generic G);
+int heapGetSize(Heap *H);
+void heapMake(Heap *H);
+Generic heapGetDatum(Heap *H, int i);
+
+/*Algoritmo LRU*/
+void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference);
 int lruAlgorithm(MemoryCache*mem,Queue*queue);
+
+/*Algoritmo LRUk*/
+void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference, int k);
 int lrukAlgorithm(MemoryCache*mem,Queue*queuem, int k);
 
-void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference);
-void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference, int k);
+/*Algoritmo Clock*/
 void memoryCacheInsertClock(MemoryCache*mem, List*list, char*reference);
-
 int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem);
-void memoryCachePrint(MemoryCache*mem);
-void printList(List*list);
 
+/*Algoritmo Optimo*/
+int getNumLines(char* filename);
+char **listReference(char *filePath);
+void memoryCacheInsertOptimal(MemoryCache*mem, char **list, int sizeList, int currentIndex);
+int optimalAlgorithm(MemoryCache *mem, char**list, int sizeList, int currentIndex);
+void testOptimaAlgorithm();
+
+/*Test*/
 void testLRUAlgorithm();
 void testClockAlgorithm();
 void testLRUKAlgorithm();
-
-int getNumLines(char* filename);
-char **listReference(char *filePath);
 
 /*******************************************************/
 
@@ -194,7 +233,7 @@ Item *itemNew(char*reference){
 }
 
 void itemPrint(Item *item){
-    printf("%s\n",item->reference);
+    printf("%s",item->reference);
 }
 
 
@@ -399,6 +438,117 @@ void nodeListRemove(List*list, NodeList*it) {
     }
 }
 
+/*Heap*/
+int heapIsEmpty(Heap *H){
+	return (H->nData == 0);
+}
+
+Heap *heapNew(int max, TSort type, cmpfn cmp){
+	Heap *H;
+	int i;
+	H = malloc(sizeof(Heap));
+	H->Data = malloc(sizeof(Generic)* max);
+	for(i = 0; i < max; i++)
+		H->Data[i] = NULL;
+	H->max = max;
+	H->nData = 0;
+	H->type = type;
+        H->cmp = cmp;
+	return H;
+}
+
+Generic heapDeQueue(Heap *H){
+	Generic gmax;
+	if(!heapIsEmpty(H)){
+		gmax = H->Data[0];
+		heapSwap(H,0,H->nData-1);
+		H->nData --;
+                heapFix(H, 0);
+		return gmax;
+	}
+	return NULL;
+}
+
+void heapEnQueue(Heap *H, Generic G){
+	int padre, i;
+	if(H->nData < H->max){
+		H->Data[H->nData] = G;
+		H->nData++;
+		i = H->nData-1;
+		padre = heapIdxFather(H,i);
+		while((i>=0 && padre>=0) && heapCompareXType(H,i, padre)){
+			heapSwap(H,i,padre);
+			i = padre;
+			padre = heapIdxFather(H,i);
+		}
+	}
+}
+
+
+int heapIdxLeft(Heap *H, int pospadre){
+	int indiceizq;
+	indiceizq = pospadre *2	+1;
+	if(indiceizq < H->nData) return indiceizq;
+	return -1;
+}
+int heapIdxRight(Heap *H, int pospadre){
+	int indiceder;
+	indiceder = pospadre *2	+2;
+	if(indiceder < H->nData) return indiceder;
+	return -1;
+}
+int heapIdxFather(Heap *H, int poshijo){
+	int indicepadre;
+	indicepadre = (poshijo-1)/2;
+	if(poshijo!=0) return indicepadre;
+	return -1;
+}
+
+static void heapFix(Heap *H, int posnodo){
+	int pos_mayor, izq, der;
+	pos_mayor = posnodo;
+	izq = heapIdxLeft(H, posnodo);
+	der = heapIdxRight(H, posnodo);
+	if(izq>=0 && heapCompareXType(H,izq,posnodo))
+		pos_mayor = izq;
+	if(der>=0 && heapCompareXType(H,der,pos_mayor))
+		pos_mayor = der;
+	if(pos_mayor != posnodo){
+		heapSwap(H,pos_mayor,posnodo);
+		heapFix(H,pos_mayor);
+	}
+}
+
+static int heapCompareXType(Heap *H, int idxa, int idxb){
+	if(H->type == DESC)
+		return (H->cmp(H->Data[idxa],H->Data[idxb]) > 0);
+	else if(H->type == ASC)
+		return (H->cmp(H->Data[idxa],H->Data[idxb]) < 0);
+	return -1;
+}
+
+Generic heapGetDatum(Heap *H, int i){
+	return H->Data[i];
+}
+
+int heapGetSize(Heap *H){
+    return H->nData;
+}
+
+void heapMake(Heap *H){
+	int i;
+	for(i = H->nData/2-1; i >= 0; i --){
+		heapFix(H, i);
+	}
+}
+
+static void heapSwap(Heap *H, int idxa, int idxb){
+    Generic tmp;
+    tmp = H->Data[idxa];
+    H->Data[idxa] = H->Data[idxb];
+    H->Data[idxb] = tmp;
+}
+
 int lruAlgorithm(MemoryCache*mem, Queue*queue) {
     NodeList*remPage = deQueue(queue);//quitar el ultimo de la cola
     Item *remItem = (void*) remPage->value;
@@ -451,6 +601,7 @@ void memoryCachePrint(MemoryCache*mem){
             itemPrint(mem->data[i]);
         }
     }
+    printf("\n");
 }
 
 void printList(List*list){
@@ -558,21 +709,57 @@ char **listReference(char *filePath){
     return list;
 }
 
-int optimalAlgorithm(MemoryCache *mem, char**list, int currentIndex){
-    printf("entro a la funcion \n");
-    int i;
-    Item *reqPage;
-    for( i = currentIndex + mem->size ; i > currentIndex  ; i-- ){
-        reqPage = hashTableGet(mem->table,list[i]);
-        if(reqPage!=NULL){
-            return reqPage->index;
-        }
-    }
-    return currentIndex + mem->size;
+
+int compararItems(Item *a,Item *b){
+	if(a->index == b->index){
+		return 0;
+	}
+	if(a->index > b->index){
+		return 1;
+	}
+	return -1;
 }
 
-void memoryCacheInsertOptimal(MemoryCache*mem, char **list,int currentIndex){
-    printf("hola mundo \n");
+int optimalAlgorithm(MemoryCache *mem, char**list, int sizeList, int currentIndex){
+    int i, j , size;
+    Item *item,*itemTmp,*reqPage;
+    int flag = 0;
+    Heap *heap =heapNew(mem->size,DESC,(cmpfn)compararItems);
+
+   	if( sizeList - currentIndex > mem->size){
+    	size = mem->size;
+    }else{
+    	size = sizeList - currentIndex - 1;
+    }
+    for(i=0; i < mem->size ; i++){
+    	flag = 0;
+    	item = mem->data[i];
+    	for(j = currentIndex + 1 ; j < currentIndex + 1 + size ; j++){
+    		if( strcmp(list[j],item->reference) == 0){
+    			flag = 1;
+    			itemTmp = itemNew(list[j]);
+    			itemTmp->index = j; 
+    			heapEnQueue(heap,itemTmp);//insertar en el heap
+    			break;
+    		}
+    	}
+    	if(!flag){
+    		//el elemento no se encuentra en la ventana asi que puede ser desalojado
+    		reqPage = hashTableGet(mem->table,item->reference);
+    		hashTableRemove(mem->table,reqPage);
+    		return item->index;
+    	}
+    }
+    itemTmp = NULL;
+	itemTmp = heapDeQueue(heap);
+	//itemTmp : item mas lejano de referenciar, buscar que elemento es la cache
+	reqPage = hashTableGet(mem->table,itemTmp->reference);
+	hashTableRemove(mem->table,reqPage);
+	free(heap);
+	return reqPage->index;
+}
+
+void memoryCacheInsertOptimal(MemoryCache*mem, char **list, int sizeList, int currentIndex){
     Item *rPage = hashTableGet(mem->table,list[currentIndex]);
     if (rPage == NULL) {//hubo un miss dado que la pagina no esta en la cache
         mem->misses++;
@@ -583,8 +770,8 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list,int currentIndex){
             mem->currentSize++;
             hashTableInsert(mem->table, newItem);
         } else {
-            //algoritmos de desalojo
-            int index = optimalAlgorithm(mem,list,currentIndex);
+            //algoritmo de desalojo
+            int index = optimalAlgorithm(mem,list,sizeList,currentIndex);
             mem->data[index] = newItem;
             newItem->index = index;
             hashTableInsert(mem->table, newItem);
@@ -592,21 +779,21 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list,int currentIndex){
     } else {//hubo un hit
         mem->hits++;       
     }
-     printf("chao mundo \n");
 }
 
 void testOptimaAlgorithm(){
-    MemoryCache*mem=memoryCacheNew(50);
-    char **list = listReference("head.txt");
+    MemoryCache*mem=memoryCacheNew(100);
+    char **list = listReference("workload.txt");
     int i;
-    int max=getNumLines("head.txt");
-    
+    int max=getNumLines("workload.txt");
     for(i=0;i<max;i++){
-        memoryCacheInsertOptimal(mem,list,i);
+        memoryCacheInsertOptimal(mem,list,max,i);
     }
+    //memoryCachePrint(mem);
     printf("Hits: %d\n",mem->hits);
     printf("Misses: %d\n",mem->misses);
 }
+
 
 int main(int argc, char** argv) {
     /*
@@ -625,7 +812,6 @@ int main(int argc, char** argv) {
         testClockAlgorithm();*/
 
     testOptimaAlgorithm();
-
     return 0;
 }
 
