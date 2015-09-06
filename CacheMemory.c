@@ -709,7 +709,6 @@ char **listReference(char *filePath){
     return list;
 }
 
-
 int compararItems(Item *a,Item *b){
 	if(a->index == b->index){
 		return 0;
@@ -758,7 +757,6 @@ int optimalAlgorithm(MemoryCache *mem, char**list, Heap*heap,int sizeList, int c
 	while(!heapIsEmpty(heap)){
 		free(heapDeQueue(heap));
 	}
-	
 	return reqPage->index;
 }
 
@@ -806,9 +804,6 @@ int main(int argc, char** argv) {
     
     else if (strcmp("OPTIMO",argv[1])==0)
     	testOptimalAlgorithm(argv[3],sizeCache);
-    
-
-
     return 0;
 }
 
