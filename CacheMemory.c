@@ -114,14 +114,14 @@ int clockAlgorithm(MemoryCache *mem, List *references,Item *newItem);
 /*Algoritmo Optimo*/
 int getNumLines(char* filename);
 char **listReference(char *filePath);
-void memoryCacheInsertOptimal(MemoryCache*mem, char **list, int sizeList, int currentIndex);
-int optimalAlgorithm(MemoryCache *mem, char**list, int sizeList, int currentIndex);
-void testOptimaAlgorithm();
+int optimalAlgorithm(MemoryCache *mem, char**list, Heap*heap,int sizeList, int currentIndex);
+void memoryCacheInsertOptimal(MemoryCache*mem, char **list, Heap*heap, int sizeList, int currentIndex);
 
 /*Test*/
-void testLRUAlgorithm();
-void testClockAlgorithm();
-void testLRUKAlgorithm();
+void testLRUAlgorithm(char *filePath, int sizeCache);
+void testLRUKAlgorithm(char *filePath, int sizeCache);
+void testClockAlgorithm(char *filePath, int sizeCache);
+void testOptimalAlgorithm(char *filePath,int sizeCache);
 
 /*******************************************************/
 
@@ -720,12 +720,11 @@ int compararItems(Item *a,Item *b){
 	return -1;
 }
 
-int optimalAlgorithm(MemoryCache *mem, char**list, int sizeList, int currentIndex){
+int optimalAlgorithm(MemoryCache *mem, char**list, Heap*heap,int sizeList, int currentIndex){
     int i, j , size;
     Item *item,*itemTmp,*reqPage;
     int flag = 0;
-    Heap *heap =heapNew(mem->size,DESC,(cmpfn)compararItems);
-
+    
    	if( sizeList - currentIndex > mem->size){
     	size = mem->size;
     }else{
@@ -755,11 +754,16 @@ int optimalAlgorithm(MemoryCache *mem, char**list, int sizeList, int currentInde
 	//itemTmp : item mas lejano de referenciar, buscar que elemento es la cache
 	reqPage = hashTableGet(mem->table,itemTmp->reference);
 	hashTableRemove(mem->table,reqPage);
+
+	while(!heapIsEmpty(heap)){
+		free(heapDeQueue(heap));
+	}
+	free(heap->Data);
 	free(heap);
 	return reqPage->index;
 }
 
-void memoryCacheInsertOptimal(MemoryCache*mem, char **list, int sizeList, int currentIndex){
+void memoryCacheInsertOptimal(MemoryCache*mem, char **list, Heap*heap, int sizeList, int currentIndex){
     Item *rPage = hashTableGet(mem->table,list[currentIndex]);
     if (rPage == NULL) {//hubo un miss dado que la pagina no esta en la cache
         mem->misses++;
@@ -771,7 +775,7 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list, int sizeList, int cu
             hashTableInsert(mem->table, newItem);
         } else {
             //algoritmo de desalojo
-            int index = optimalAlgorithm(mem,list,sizeList,currentIndex);
+            int index = optimalAlgorithm(mem,list,heap,sizeList,currentIndex);
             mem->data[index] = newItem;
             newItem->index = index;
             hashTableInsert(mem->table, newItem);
@@ -781,22 +785,10 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list, int sizeList, int cu
     }
 }
 
-void testOptimaAlgorithm(){
-    MemoryCache*mem=memoryCacheNew(100);
-    char **list = listReference("workload.txt");
-    int i;
-    int max=getNumLines("workload.txt");
-    for(i=0;i<max;i++){
-        memoryCacheInsertOptimal(mem,list,max,i);
-    }
-    //memoryCachePrint(mem);
-    printf("Hits: %d\n",mem->hits);
-    printf("Misses: %d\n",mem->misses);
-}
 
 
 int main(int argc, char** argv) {
-    /*
+    
     int sizeCache;
     if (argc != 4) {
         printf("Usage: %s <POLITICA> <size-Cache> <filename>\n",argv[0]);
@@ -805,27 +797,31 @@ int main(int argc, char** argv) {
     sizeCache = atoi(argv[2]);
 
     if (strcmp("LRU",argv[1]) == 0)
-        testLRUAlgorithm();
-    else if (strcmp("LRUK",argv[1]) == 0)
-        testLRUKAlgorithm();
-    else if (strcmp("CLOCK",argv[1]) == 0)
-        testClockAlgorithm();*/
+        testLRUAlgorithm(argv[3],sizeCache);
 
-    testOptimaAlgorithm();
+    else if (strcmp("LRUK",argv[1]) == 0)
+        testLRUKAlgorithm(argv[3],sizeCache);
+    
+    else if (strcmp("CLOCK",argv[1]) == 0)
+        testClockAlgorithm(argv[3],sizeCache);
+    
+    else if (strcmp("OPTIMO",argv[1])==0)
+    	testOptimalAlgorithm(argv[3],sizeCache);
+    
     return 0;
 }
 
-void testLRUAlgorithm(){
+void testLRUAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
     char linea[1000];
     strcpy(linea,"");
     
-    if ((fp = fopen("workload.txt", "r")) == NULL){
+    if ((fp = fopen(filePath, "r")) == NULL){
         printf("error \n");
         return ;
     }
 
-    MemoryCache*mem = memoryCacheNew(8000);
+    MemoryCache*mem = memoryCacheNew(sizeCache);
     Queue*queue = queueNew();
     
     while (fgets(linea,1000, fp) != NULL){
@@ -844,18 +840,17 @@ void testLRUAlgorithm(){
     free(queue);
 }
 
-
-void testClockAlgorithm(){
+void testClockAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
     char linea[1000];
     strcpy(linea,"");
     
-    if ((fp = fopen("workload.txt", "r")) == NULL){
+    if ((fp = fopen(filePath, "r")) == NULL){
         printf("error \n");
         return ;
     }
     
-    MemoryCache*mem=memoryCacheNew(800);
+    MemoryCache*mem=memoryCacheNew(sizeCache);
     List *list = listNew();
     circleListMake(list);
     
@@ -876,7 +871,7 @@ void testClockAlgorithm(){
     free(list);
 }
 
-void testLRUKAlgorithm(){
+void testLRUKAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
     char linea[1000];
     strcpy(linea,"");
@@ -886,7 +881,7 @@ void testLRUKAlgorithm(){
         return ;
     }
 
-    MemoryCache*mem = memoryCacheNew(8000);
+    MemoryCache*mem = memoryCacheNew(sizeCache);
     Queue*queue = queueNew();
     int i=0;
     while (fgets(linea,1000, fp) != NULL){
@@ -904,4 +899,25 @@ void testLRUKAlgorithm(){
     printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
 	free(mem);
     free(queue);
+}
+
+
+void testOptimalAlgorithm(char *filePath,int sizeCache){
+    MemoryCache*mem=memoryCacheNew(sizeCache);
+    Heap *heap = heapNew(sizeCache,DESC,(cmpfn)compararItems);
+    char **list = listReference(filePath);
+    int i;
+    int max=getNumLines(filePath);
+    for(i=0;i<max;i++){
+        memoryCacheInsertOptimal(mem,list,heap,max,i);
+    }
+
+    printf("Evaluando una cache algoritmo Optimo con %d referencias:\n",mem->hits + mem->misses);
+    float total=mem->hits + mem->misses;
+	float hitRate = mem->hits/total;
+    float missRate = mem->misses/total;
+	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
+    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
+    free(list);
+    free(mem);
 }
