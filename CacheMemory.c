@@ -48,6 +48,7 @@ typedef struct MemoryCache{
     HashTable *table;
     Item**data;
     int misses;
+    int w_misses;
     int hits;
     int size;
     int currentSize;
@@ -229,13 +230,9 @@ Item *itemNew(char*reference){
     i->reference=(char*)malloc(sizeof(char)*strlen(reference)+1);
     memset(i->reference,'0',sizeof(char)*strlen(reference)+1);
     strcpy(i->reference,reference);
+    i->bit = 1;
     return i;
 }
-
-void itemPrint(Item *item){
-    printf("%s",item->reference);
-}
-
 
 Cubeta *cubetaNew(){
     Cubeta *c=(Cubeta*)malloc(sizeof(Cubeta));
@@ -310,6 +307,7 @@ MemoryCache *memoryCacheNew(int size){
     mem -> currentSize = 0;
     mem -> hits = 0;
     mem -> misses = 0;
+    mem -> w_misses = 0;
     mem -> table = hashTableNew(size*2);
     mem -> data = (Item**)malloc(sizeof(Item)*size);
     for(i = 0; i < size; i++){
@@ -339,6 +337,7 @@ void memoryCacheInsertLRU(MemoryCache*mem,Queue*queue, char*reference){
             hashTableInsert(mem->table,newItem);
             enQueue(queue,parent);
         }else{
+            mem->w_misses++;
             //algoritmos de desalojo
             int index=lruAlgorithm(mem,queue);
             mem->data[index]=newItem;
@@ -384,6 +383,7 @@ void memoryCacheInsertLRUK(MemoryCache*mem,Queue*queue, char*reference, int k){
             hashTableInsert(mem->table,newItem);
             enQueue(queue,parent);
         }else{
+            mem->w_misses++;
             //algoritmos de desalojo
             int index=lrukAlgorithm(mem,queue,k);
             mem->data[index]=newItem;
@@ -562,8 +562,7 @@ int lrukAlgorithm(MemoryCache*mem,Queue*queue, int k){
     NodeList *t;
     for ( t = queue->end; t!=NULL; t=t->prev)
     {
-        k--;
-        if (k == 0){
+        if (k-- == 0){
             node = t;
             break;
         }
@@ -592,6 +591,10 @@ int lrukAlgorithm(MemoryCache*mem,Queue*queue, int k){
     }
     //retornar el indice en donde se debe ingresar el nuevo elemento en la cache
     return remItem->index;
+}
+
+void itemPrint(Item *item){
+    printf("%d %s",item->bit,item->reference);
 }
 
 void memoryCachePrint(MemoryCache*mem){
@@ -629,12 +632,13 @@ void memoryCacheInsertClock(MemoryCache*mem, List*list, char*reference) {
             circleListAdd(list,parent);
             mem->hand = list->end;
         } else {
+            mem->w_misses++;
             //algoritmos de desalojo
             int index = clockAlgorithm(mem,list,newItem);
             mem->data[index] = newItem;
             newItem->index = index;
             hashTableInsert(mem->table, newItem);
-            circleListAdd(list,parent);
+            //circleListAdd(list,parent);
         }
     } else {//hubo un hit
         mem->hits++;
@@ -682,6 +686,7 @@ int getNumLines(char* filename){
     return atoi(readbuf);
 }
 
+
 char **listReference(char *filePath){
     char**list;
     int num_lines = getNumLines(filePath);
@@ -708,7 +713,6 @@ char **listReference(char *filePath){
 
     return list;
 }
-
 
 int compararItems(Item *a,Item *b){
 	if(a->index == b->index){
@@ -758,8 +762,6 @@ int optimalAlgorithm(MemoryCache *mem, char**list, Heap*heap,int sizeList, int c
 	while(!heapIsEmpty(heap)){
 		free(heapDeQueue(heap));
 	}
-	free(heap->Data);
-	free(heap);
 	return reqPage->index;
 }
 
@@ -774,6 +776,7 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list, Heap*heap, int sizeL
             mem->currentSize++;
             hashTableInsert(mem->table, newItem);
         } else {
+            mem->w_misses++;
             //algoritmo de desalojo
             int index = optimalAlgorithm(mem,list,heap,sizeList,currentIndex);
             mem->data[index] = newItem;
@@ -789,31 +792,32 @@ void memoryCacheInsertOptimal(MemoryCache*mem, char **list, Heap*heap, int sizeL
 
 int main(int argc, char** argv) {
     
-    int sizeCache;
+    char* filename = argv[1];
+    char* politica = argv[2];
+    int sizeCache = atoi(argv[3]);
+
     if (argc != 4) {
-        printf("Usage: %s <POLITICA> <size-Cache> <filename>\n",argv[0]);
+        printf("Usage: %s <workload.txt> <política> <size-cache>\n",argv[0]);
             return 1;
         }
-    sizeCache = atoi(argv[2]);
 
-    if (strcmp("LRU",argv[1]) == 0)
-        testLRUAlgorithm(argv[3],sizeCache);
+    if (strcmp("lru",politica) == 0 || strcmp("LRU",politica) == 0)
+        testLRUAlgorithm(filename,sizeCache);
 
-    else if (strcmp("LRUK",argv[1]) == 0)
-        testLRUKAlgorithm(argv[3],sizeCache);
+    else if (strcmp("lruk",politica) == 0 ||strcmp("LRUK",politica) == 0)
+        testLRUKAlgorithm(filename,sizeCache);
     
-    else if (strcmp("CLOCK",argv[1]) == 0)
-        testClockAlgorithm(argv[3],sizeCache);
+    else if (strcmp("clock",politica) == 0 || strcmp("CLOCK",politica) == 0)
+        testClockAlgorithm(filename,sizeCache);
     
-    else if (strcmp("OPTIMO",argv[1])==0)
-    	testOptimalAlgorithm(argv[3],sizeCache);
-    
+    else if (strcmp("optimo",politica) == 0 || strcmp("OPTIMO",politica)==0)
+    	testOptimalAlgorithm(filename,sizeCache);
     return 0;
 }
 
 void testLRUAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
-    char linea[1000];
+    char linea[1340];
     strcpy(linea,"");
     
     if ((fp = fopen(filePath, "r")) == NULL){
@@ -824,25 +828,31 @@ void testLRUAlgorithm(char *filePath, int sizeCache){
     MemoryCache*mem = memoryCacheNew(sizeCache);
     Queue*queue = queueNew();
     
-    while (fgets(linea,1000, fp) != NULL){
+    while (fgets(linea,1340, fp) != NULL){
         memoryCacheInsertLRU(mem,queue,linea);
     }
 
     fclose(fp);
 
-    printf("Evaluando una cache algoritmo LRU con %d referencias:\n",mem->hits + mem->misses);
-    float total=mem->hits + mem->misses;
-	float hitRate = mem->hits/total;
-    float missRate = mem->misses/total;
-	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
-    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
+    int hits = mem->hits;
+    int misses = mem->misses;
+    int w_misses = mem->w_misses;
+    float total = hits + misses;
+    float w_total = hits + w_misses;
+    printf("Evaluando una cache algoritmo LRU con %.1f referencias:\nResultados:\n",total);
+    float hitRate = (float)hits/total;
+    float missRate = (float)misses/total;
+    float w_missRate = (float)w_misses/total;
+	//printf("\tHits: %d\tHits Rate: %.4f\n",hits,hitRate);
+    printf("\tMiss Rate: %.2f%% (W misses out of Q references)\n",missRate*100);
+    printf("\tMiss Rate (warm cache): %.2f%% (W misses out of Q-%d references)\n",w_missRate*100,sizeCache);
 	free(mem);
     free(queue);
 }
 
 void testClockAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
-    char linea[1000];
+    char linea[1340];
     strcpy(linea,"");
     
     if ((fp = fopen(filePath, "r")) == NULL){
@@ -854,19 +864,24 @@ void testClockAlgorithm(char *filePath, int sizeCache){
     List *list = listNew();
     circleListMake(list);
     
-    while (fgets(linea,1000, fp) != NULL){
+    while (fgets(linea,1340, fp) != NULL){
         memoryCacheInsertClock(mem,list,linea);
     }
 
     fclose(fp);
 
-    printf("Evaluando una cache algoritmo LRU Clock con %d referencias:\n",mem->hits + mem->misses);
-    float total=mem->hits + mem->misses;
-	float hitRate = mem->hits/total;
-    float missRate = mem->misses/total;
-	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
-    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
-    
+    int hits = mem->hits;
+    int misses = mem->misses;
+    int w_misses = mem->w_misses;
+    float total = hits + misses;
+    float w_total = hits + w_misses;
+    printf("Evaluando una cache algoritmo Clock con %.1f referencias:\nResultados:\n",total);
+    float hitRate = (float)hits/total;
+    float missRate = (float)misses/total;
+    float w_missRate = (float)w_misses/total;
+    //printf("\tHits: %d\tHits Rate: %.4f\n",hits,hitRate);
+    printf("\tMiss Rate: %.2f%% (W misses out of Q references)\n",missRate*100);
+    printf("\tMiss Rate (warm cache): %.2f%% (W misses out of Q-%d references)\n",w_missRate*100,sizeCache);
     free(mem);
     free(list);
 }
@@ -885,18 +900,24 @@ void testLRUKAlgorithm(char *filePath, int sizeCache){
     Queue*queue = queueNew();
     int i=0;
     while (fgets(linea,1000, fp) != NULL){
-        memoryCacheInsertLRUK(mem,queue,linea,2);
+        memoryCacheInsertLRUK(mem,queue,linea,3);
         i++;
     }
     //printf("num referencias %d\n",i);
     fclose(fp);
 
-    printf("Evaluando una cache algoritmo LRU-K con %d referencias:\n",mem->hits + mem->misses);
-    float total=mem->hits + mem->misses;
-	float hitRate = mem->hits/total;
-    float missRate = mem->misses/total;
-	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
-    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
+    int hits = mem->hits;
+    int misses = mem->misses;
+    int w_misses = mem->w_misses;
+    float total = hits + misses;
+    float w_total = hits + w_misses;
+    printf("Evaluando una cache algoritmo LRU-K con %.1f referencias:\nResultados:\n",total);
+    float hitRate = (float)hits/total;
+    float missRate = (float)misses/total;
+    float w_missRate = (float)w_misses/total;
+    //printf("\tHits: %d\tHits Rate: %.4f\n",hits,hitRate);
+    printf("\tMiss Rate: %.2f%% (W misses out of Q references)\n",missRate*100);
+    printf("\tMiss Rate (warm cache): %.2f%% (W misses out of Q-%d references)\n",w_missRate*100,sizeCache);
 	free(mem);
     free(queue);
 }
@@ -912,12 +933,18 @@ void testOptimalAlgorithm(char *filePath,int sizeCache){
         memoryCacheInsertOptimal(mem,list,heap,max,i);
     }
 
-    printf("Evaluando una cache algoritmo Optimo con %d referencias:\n",mem->hits + mem->misses);
-    float total=mem->hits + mem->misses;
-	float hitRate = mem->hits/total;
-    float missRate = mem->misses/total;
-	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
-    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
+    int hits = mem->hits;
+    int misses = mem->misses;
+    int w_misses = mem->w_misses;
+    float total = hits + misses;
+    float w_total = hits + w_misses;
+    printf("Evaluando una cache algoritmo Optimo con %.1f referencias:\nResultados:\n",total);
+    float hitRate = (float)hits/total;
+    float missRate = (float)misses/total;
+    float w_missRate = (float)w_misses/total;
+    //printf("\tHits: %d\tHits Rate: %.4f\n",hits,hitRate);
+    printf("\tMiss Rate: %.2f%% (W misses out of Q references)\n",missRate*100);
+    printf("\tMiss Rate (warm cache): %.2f%% (W misses out of Q-%d references)\n",w_missRate*100,sizeCache);
     free(list);
     free(mem);
 }
