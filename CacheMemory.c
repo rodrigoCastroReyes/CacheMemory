@@ -807,19 +807,11 @@ int main(int argc, char** argv) {
     else if (strcmp("lruk",politica) == 0 ||strcmp("LRUK",politica) == 0)
         testLRUKAlgorithm(filename,sizeCache);
     
-<<<<<<< HEAD
     else if (strcmp("clock",politica) == 0 || strcmp("CLOCK",politica) == 0)
         testClockAlgorithm(filename,sizeCache);
     
     else if (strcmp("optimo",politica) == 0 || strcmp("OPTIMO",politica)==0)
     	testOptimalAlgorithm(filename,sizeCache);
-=======
-    else if (strcmp("CLOCK",argv[1]) == 0)
-        testClockAlgorithm(argv[3],sizeCache);
-    
-    else if (strcmp("OPTIMO",argv[1])==0)
-    	testOptimalAlgorithm(argv[3],sizeCache);
->>>>>>> 2129093cb4c3d74d4f385ec12e48934533cfa36b
     return 0;
 }
 
@@ -878,7 +870,6 @@ void testClockAlgorithm(char *filePath, int sizeCache){
 
     fclose(fp);
 
-<<<<<<< HEAD
     int hits = mem->hits;
     int misses = mem->misses;
     int w_misses = mem->w_misses;
@@ -891,17 +882,6 @@ void testClockAlgorithm(char *filePath, int sizeCache){
     //printf("\tHits: %d\tHits Rate: %.4f\n",hits,hitRate);
     printf("\tMiss Rate: %.2f%% (W misses out of Q references)\n",missRate*100);
     printf("\tMiss Rate (warm cache): %.2f%% (W misses out of Q-%d references)\n",w_missRate*100,sizeCache);
-=======
-    printf("Evaluando una cache algoritmo LRU Clock con %d referencias:\n",mem->hits + mem->misses);
-    float total=mem->hits + mem->misses;
-	float hitRate = mem->hits/total;
-    float missRate = mem->misses/total;
-	printf("Hits: %d\tHits Rate: %.4f\n",mem->hits,hitRate);
-    printf("Misses: %d\tHits Rate: %.4f\n",mem->misses,missRate);
-    
-    
-
->>>>>>> 2129093cb4c3d74d4f385ec12e48934533cfa36b
     free(mem);
     free(list);
 }
