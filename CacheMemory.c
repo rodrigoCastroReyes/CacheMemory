@@ -935,7 +935,7 @@ int main(int argc, char** argv) {
 
 void testLRUAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
-    char linea[1000];
+    char linea[1340];
     strcpy(linea,"");
     
     if ((fp = fopen(filePath, "r")) == NULL){
@@ -946,7 +946,7 @@ void testLRUAlgorithm(char *filePath, int sizeCache){
     MemoryCache*mem = memoryCacheNew(sizeCache);
     Queue*queue = queueNew();
     
-    while (fgets(linea,1000, fp) != NULL){
+    while (fgets(linea,1340, fp) != NULL){
         memoryCacheInsertLRU(mem,queue,linea);
     }
 
@@ -997,7 +997,7 @@ void testClockAlgorithm(char *filePath, int sizeCache){
 
 void testLRUKAlgorithm(char *filePath, int sizeCache){
     FILE *fp;
-    char linea[1000];
+    char linea[1340];
     strcpy(linea,"");
     
     if ((fp = fopen("workload.txt", "r")) == NULL){
@@ -1008,7 +1008,7 @@ void testLRUKAlgorithm(char *filePath, int sizeCache){
     MemoryCache*mem = memoryCacheNew(sizeCache);
     Queue*queue = queueNew();
     int i=0;
-    while (fgets(linea,1000, fp) != NULL){
+    while (fgets(linea,1340, fp) != NULL){
         memoryCacheInsertLRUK(mem,queue,linea,2);
         i++;
     }
